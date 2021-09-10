@@ -1,4 +1,4 @@
-FROM ubuntu:latest as stage0
+FROM ubuntu:20.04 as stage0
 ENV DEBIAN_FRONTEND="noninteractive"
 RUN apt-get update && \
     apt-get upgrade -y && \
