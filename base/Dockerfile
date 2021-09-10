@@ -1,25 +1,21 @@
-FROM manjarolinux/base AS zero
-ARG BRANCH=stable
-RUN pacman-mirrors --continent && \
-    pacman-mirrors --fasttrack 5 && \
-    pacman-mirrors --api --set-branch ${BRANCH} && \
-    pacman -Syyu --noconfirm && \
+FROM archlinux/archlinux AS zero
+RUN pacman -Syyu --noconfirm && \
+    pacman -S --noconfirm base-devel git && \
     pacman -Scc --noconfirm && \
     rm -rf /var/cache/pacman/pkg
 
 FROM zero AS paru
-RUN pacman -Syu --noconfirm git && \
-    useradd -m user
-USER user
-RUN git clone https://aur.archlinux.org/paru-bin.git /home/user/paru-bin
-WORKDIR /home/user/paru-bin
+RUN  useradd -m temp 
+USER temp
+RUN git clone https://aur.archlinux.org/paru-bin.git /home/temp/paru-bin
+WORKDIR /home/temp/paru-bin
 RUN makepkg -s
 USER root
 RUN pacman -Scc --noconfirm && \
     rm -rf /var/cache/pacman/pkg
 
 FROM zero AS aur
-COPY --from=paru /home/user/paru-bin/paru-bin*pkg.tar.zst /root/paru-bin.pkg.tar.zst
+COPY --from=paru /home/temp/paru-bin/paru-bin*pkg.tar.zst /root/paru-bin.pkg.tar.zst
 RUN pacman -U --noconfirm /root/paru-bin.pkg.tar.zst && \
     rm /root/paru-bin.pkg.tar.zst && \
     pacman -Scc --noconfirm && \
