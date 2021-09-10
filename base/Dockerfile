@@ -1,35 +1,24 @@
-FROM archlinux/archlinux AS zero
-RUN pacman -Syyu --noconfirm && \
-    pacman -S --noconfirm base-devel git && \
-    pacman -Scc --noconfirm && \
-    rm -rf /var/cache/pacman/pkg
+FROM ubuntu:latest as stage0
+ENV DEBIAN_FRONTEND="noninteractive"
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    rm -rf /var/cache/apt/archives/*
 
-FROM zero AS paru
-RUN  useradd -m temp 
-USER temp
-RUN git clone https://aur.archlinux.org/paru-bin.git /home/temp/paru-bin
-WORKDIR /home/temp/paru-bin
-RUN makepkg -s
-USER root
-RUN pacman -Scc --noconfirm && \
-    rm -rf /var/cache/pacman/pkg
+FROM stage0 AS stage1
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common && \
+    # add-apt-repository -ny ppa:jonathonf/vim && \
+    # add-apt-repository -ny ppa:git-core/ppa && \
+    rm -rf /var/cache/apt/archives/*
 
-FROM zero AS aur
-COPY --from=paru /home/temp/paru-bin/paru-bin*pkg.tar.zst /root/paru-bin.pkg.tar.zst
-RUN pacman -U --noconfirm /root/paru-bin.pkg.tar.zst && \
-    rm /root/paru-bin.pkg.tar.zst && \
-    pacman -Scc --noconfirm && \
-    rm -rf /var/cache/pacman/pkg
-
-FROM aur AS base
-RUN paru -Syu --noconfirm sudo zsh starship && \
-    paru -Scc --noconfirm && \
-    rm -rf /root/.cache/paru && \
-    echo "ALL    ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers
-ARG USER=user
-RUN useradd -m ${USER} -s /bin/zsh
-USER ${USER}
-RUN echo "eval $(starship init zsh)" > /home/${USER}/.zshrc && \
-    mkdir /home/${USER}/.config
-COPY starship.toml /home/${USER}/.config
-CMD [ "/bin/zsh" ]
+FROM stage0 AS stage2
+COPY --from=stage1 /etc/apt/sources.list.d/* /etc/apt/sources.list.d/
+COPY --from=stage1 /etc/apt/trusted.gpg.d/* /etc/apt/trusted.gpg.d/
+RUN sed -i '/deb-src/s/^# //' /etc/apt/sources.list
+RUN apt-get update
+RUN yes | unminimize
+RUN apt-get install -y man-db manpages-posix
+RUN apt-get install -y zsh
+RUN apt-get install -y git
+RUN apt-get install -y build-essential
+RUN rm -rf /var/cache/apt/archives/*
